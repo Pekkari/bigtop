@@ -19,9 +19,51 @@ from charmhelpers.core import hookenv
 from charms.layer.apache_bigtop_base import get_package_version
 from charms.layer.bigtop_zookeeper import Zookeeper
 from charms.leadership import leader_set, leader_get
-from charms.reactive import set_state, when, when_not, is_state
+from charms.reactive import set_state, remove_state, hook, when, when_not, is_state
 from charms.reactive.helpers import data_changed
+import shutil
+from os import chmod
 
+
+@when('local-monitors.available')
+def setup_nagios(nagios):
+    config = hookenv.config()
+    unit_name = hookenv.local_unit()
+    nagios.add_check(['/usr/local/lib/nagios/plugins/check_zookeeper_cluster'],
+        name="check_zookeeper_cluster",
+        description="Zookeeper cluster status",
+        context=config["nagios_context"],
+        servicegroup=config['nagios_servicegroups']
+        unit=unit_name
+    )
+
+@when('nrpe-external-master.available')
+def setup_nagios(nagios):
+    config = hookenv.config()
+    unit_name = hookenv.local_unit()
+    nagios.add_check(['/usr/local/lib/nagios/plugins/check_zookeeper_cluster'],
+        name="check_zookeeper_cluster",
+        description="Zookeeper cluster status",
+        context=config["nagios_context"],
+        servicegroup=config['nagios_servicegroups']
+        unit=unit_name
+    )
+
+
+@hook('upgrade-charm')
+def nrpe_helper_upgrade_charm():
+    # Make sure the nrpe handler will get replaced at charm upgrade
+    remove_state('zookeeper.nrpe_helper.installed')
+
+
+@when('zookeeper.installed')
+@when_not('zookeeper.nrpe_helper.installed')
+def install_nrpe_helper():
+    src = '{}/nrpe.d/zookeeper.py'.format(charmhelpers.charm_dir())
+    dst = '/usr/local/lib/nagios/plugins/check_zookeeper_cluster'
+    shutil.copy(src, dst)
+    chmod(dst, 0o755)
+    set_state('zookeeper.nrpe_helper.installed')
 
 @when('bigtop.available')
 @when_not('zookeeper.installed')

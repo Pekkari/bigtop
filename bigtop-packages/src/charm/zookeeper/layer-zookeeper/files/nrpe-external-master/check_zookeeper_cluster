@@ -1,0 +1,53 @@
+#!/usr/bin/python
+
+import subprocess
+import sys
+import os
+import warnings
+
+
+def show_zookeeper_status():
+        command = "echo \'ruok\' | nc  $(netstat -lntp 2>/dev/null | grep 2181| grep LISTEN|awk '{print $4}'| cut -f1 -d ':') 2181"
+        os.chdir('/tmp')
+        zoo_status = subprocess.Popen(command, shell=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            cwd='/tmp/',
+                            executable='/bin/bash')
+        output, err = zoo_status.communicate()
+        if len(err) > 0:
+            print "UNKNOWN service state"
+            print err
+            sys.exit(3)
+        elif ('imok' in output):
+            print "Zookeeper status OK"
+        else:
+            print "There is a problem with a status of Zookeeper"
+            sys.exit(2)
+
+
+def show_zookeeper_cluster():
+        command = "echo \'stat\' | nc $(netstat -lntp 2>/dev/null | grep 2181| grep LISTEN|awk '{print $4}'| cut -f1 -d ':') 2181"
+        zoo_status = subprocess.Popen(command, shell=True,
+                            stdout=subprocess.PIPE,
+                            cwd='/tmp/',
+                            stderr=subprocess.PIPE,
+                            executable='/bin/bash')
+        output, err = zoo_status.communicate()
+        if len(err) > 0:
+            print "UNKNOWN service state"
+            print err
+            sys.exit(3)
+        elif ('Mode: leader' in output or
+                         'Mode: follower' in output):
+            print "Zookeeper cluster OK"
+        else:
+            print "There is a problem with a cluster of Zookeeper (standalone mode)"
+            sys.exit(0)
+
+
+if __name__ == '__main__':
+    show_zookeeper_status()
+    show_zookeeper_cluster()
+    sys.exit(0)
+
